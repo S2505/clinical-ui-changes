@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Upload, Image as ImageIcon } from 'lucide-react';
+import { History, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { encryptQuestion, decryptAnswer } from './utils/encryption';
 import { Header } from './components/Header';
@@ -46,18 +46,15 @@ const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [attachments, setAttachments] = useState([]);
-  const [showImageUpload, setShowImageUpload] = useState(false);
 
   const { start, stop } = useSpeechRecognition((transcript) => {
     setInput(transcript);
   });
 
   const { speak: speakText, stop: stopSpeaking } = useSpeechSynthesis(
-    () => setIsSpeaking(true),
-    () => setIsSpeaking(false)
+    () => setIsListening(true),
+    () => setIsListening(false)
   );
 
   // Save messages to localStorage whenever they change
@@ -67,45 +64,47 @@ const App = () => {
 
   const handleSend = async () => {
     if (input.trim() === '' && attachments.length === 0) return;
-    
+
     const timestamp = new Date().toISOString();
     const newUserMessage = {
       type: 'user',
       content: input,
-      timestamp
+      timestamp,
     };
 
-    setMessages(prev => [...prev, newUserMessage]);
+    setMessages((prev) => [...prev, newUserMessage]);
     setCurrentQuestion(input);
     setInput('');
     setIsLoading(true);
-    
+
     try {
       const encryptedQuestion = encryptQuestion(input);
       const response = await axios.post(backendURL, {
         question: encryptedQuestion,
       });
-      
+
       const decryptedAnswer = decryptAnswer(response.data.answer);
-      
+
       const newBotMessage = {
         type: 'bot',
         content: decryptedAnswer,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
-      setMessages(prev => [...prev, newBotMessage]);
+      setMessages((prev) => [...prev, newBotMessage]);
       setCurrentAnswer(decryptedAnswer);
       setIsLoading(false);
-      
     } catch (error) {
       console.error('Error:', error);
       const errorMessage = handleError(error);
-      setMessages(prev => [...prev, {
-        type: 'bot',
-        content: errorMessage,
-        timestamp: new Date().toISOString()
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: 'bot',
+          content: errorMessage,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
       setCurrentAnswer(errorMessage);
       setIsLoading(false);
     }
@@ -134,29 +133,13 @@ const App = () => {
     setIsDrawerOpen(false);
   };
 
-  // Handle file attachment
   const handleAttachment = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
-        setAttachments(prev => [...prev, file]);
-      }
-    };
-    input.click();
-  };
-
-  // Handle image upload
-  const handleImageUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        // Handle image upload logic
-        console.log('Image uploaded:', file);
+        setAttachments((prev) => [...prev, file]);
       }
     };
     input.click();
@@ -165,31 +148,37 @@ const App = () => {
   return (
     <ThemeProvider>
       <div className="flex h-screen bg-white dark:bg-gray-900">
-        <ChatHistory 
-          isOpen={isDrawerOpen} 
+        {/* Chat History Sidebar */}
+        <ChatHistory
+          isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           messages={messages}
           onSelectMessage={handleSelectMessage}
+          clearHistory={clearHistory}
         />
-        
+
+        {/* Main Content */}
         <div className="flex-1 flex flex-col">
           <Header>
-            <button
-              onClick={() => setIsDrawerOpen(true)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-              title="Chat History"
-            >
-              <History size={20} />
-            </button>
+            <div className="flex items-center justify-end">
+              {/* Chat History Button */}
+              <button
+                onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                title="Chat History"
+              >
+                <History size={20} />
+              </button>
+            </div>
           </Header>
-          
+
           <ChatDisplay
             currentQuestion={currentQuestion}
             currentAnswer={currentAnswer}
             isLoading={isLoading}
             setInput={setInput}
           />
-          
+
           <InputSection
             input={input}
             setInput={setInput}
@@ -197,7 +186,6 @@ const App = () => {
             handleSend={handleSend}
             handleVoiceInput={handleVoiceInput}
             handleAttachment={handleAttachment}
-            handleImageUpload={handleImageUpload}
           />
         </div>
       </div>
